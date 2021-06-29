@@ -1,4 +1,3 @@
-package Fibonacci.src;
 
 //Print pattern in right angle triangle using Fibonacci Numbers
 
