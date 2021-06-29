@@ -1,4 +1,3 @@
-package Fibonacci.src;
 
 import java.util.Arrays;
 import java.util.Scanner;
@@ -13,12 +12,12 @@ public class Anagram {
         char ch1[] = s1.toCharArray();
         char ch2[] = s2.toCharArray();
         sc.close();
-        System.out.println(Anagram.solve(ch1, ch2));
+        System.out.println(solve(ch1, ch2));
 
        
     }
 
-    private static boolean solve(char[] ch1, char[] ch2) {
+    public static boolean solve(char[] ch1, char[] ch2) {
         Arrays.sort(ch1);
         Arrays.sort(ch2);
         if (Arrays.equals(ch1, ch2)) {
