@@ -1,6 +1,6 @@
 import java.util.*;
 public class Palindrome {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args)  {
       int remainder, sum =0, temp;
       Scanner sc = new Scanner(System.in);
         System.out.println("Enter a number to check if it is palindrome or not : ");
