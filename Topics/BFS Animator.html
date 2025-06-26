@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFS Algorithm Animation</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light background */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #bfs-container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 700px; /* Max width for larger screens */
+        }
+
+        canvas {
+            border: 2px solid #cbd5e0; /* Light border */
+            border-radius: 0.75rem; /* Slightly rounded canvas */
+            background-color: #e2e8f0; /* Canvas background */
+            display: block;
+            width: 100%; /* Make canvas responsive */
+            height: auto; /* Maintain aspect ratio */
+            touch-action: none; /* Prevent default touch actions like scrolling */
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+            gap: 0.75rem; /* Space between buttons */
+            margin-top: 1.5rem;
+            justify-content: center;
+        }
+
+        .control-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* Rounded button corners */
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: none;
+        }
+
+        .control-button:active {
+            transform: translateY(1px);
+        }
+
+        .start-button {
+            background-color: #3b82f6; /* Blue */
+            color: white;
+        }
+
+        .start-button:hover {
+            background-color: #2563eb;
+        }
+
+        .reset-button {
+            background-color: #ef4444; /* Red */
+            color: white;
+        }
+
+        .reset-button:hover {
+            background-color: #dc2626;
+        }
+
+        .message {
+            margin-top: 1rem;
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            color: #4a5568; /* Gray */
+            min-height: 1.5em; /* Ensure space even when empty */
+            text-align: center;
+        }
+
+        .instructions {
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #4a5568;
+        }
+
+        /* Responsive adjustments */
+        @media (min-width: 768px) {
+            .controls {
+                flex-wrap: nowrap;
+            }
+        }
+    </style>
+</head>
+<body class="selection:bg-blue-200 selection:text-blue-900">
+<div id="bfs-container">
+    <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Mouse in the Maze: BFS!</h1>
+    <p class="instructions text-base md:text-lg">
+        Click on a square to make it your <span class="font-bold text-green-600">start (green)</span> or the <span class="font-bold text-red-600">cheese (red)</span>, or a <span class="font-bold text-gray-800">wall (black)</span>.
+    </p>
+    <canvas id="bfsCanvas"></canvas>
+    <div class="controls">
+        <button id="startButton" class="control-button start-button">Start BFS</button>
+        <button id="resetButton" class="control-button reset-button">Reset</button>
+    </div>
+    <div id="message" class="message"></div>
+</div>
+
+<script>
+        // Get the canvas and its drawing context
+        const canvas = document.getElementById('bfsCanvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const resetButton = document.getElementById('resetButton');
+        const messageDiv = document.getElementById('message');
+
+        // Grid dimensions
+        const COLS = 20;
+        const ROWS = 20;
+        let CELL_SIZE; // Will be calculated dynamically
+
+        // Grid states
+        const EMPTY = 0;
+        const START = 1;
+        const TARGET = 2;
+        const OBSTACLE = 3;
+        const VISITED = 4;
+        const QUEUED = 5;
+        const PATH = 6;
+
+        // Colors for visualization
+        const COLORS = {
+            [EMPTY]: '#FFFFFF',      // White
+            [START]: '#10B981',      // Green-500
+            [TARGET]: '#EF4444',     // Red-500
+            [OBSTACLE]: '#4B5563',   // Gray-700
+            [VISITED]: '#93C5FD',    // Blue-300 (light visited)
+            [QUEUED]: '#FCD34D',     // Yellow-300 (currently in queue)
+            [PATH]: '#F97316',       // Orange-500 (shortest path)
+        };
+
+        let grid = [];
+        let startNode = null;
+        let targetNode = null;
+        let queue = [];
+        let visited = new Set();
+        let parentMap = new Map(); // To reconstruct path
+        let isRunning = false;
+        let animationFrameId = null;
+        let currentBFSStep = 0;
+        const BFS_STEP_DELAY = 100; // Milliseconds per BFS step (for animation)
+
+        // --- Utility Functions ---
+
+        // Function to set canvas size and cell size based on container width
+        function setCanvasSize() {
+            const containerWidth = canvas.parentElement.clientWidth;
+            // Aim for a square canvas that fits well on mobile
+            const size = Math.min(containerWidth - 30, 600); // Max 600px, responsive
+            canvas.width = size;
+            canvas.height = size;
+            CELL_SIZE = canvas.width / COLS;
+            drawGrid(); // Redraw grid after resize
+        }
+
+        // Initialize grid with empty cells
+        function initializeGrid() {
+            grid = Array(ROWS).fill(0).map(() => Array(COLS).fill(EMPTY));
+            startNode = null;
+            targetNode = null;
+            queue = [];
+            visited = new Set();
+            parentMap = new Map();
+            isRunning = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            currentBFSStep = 0;
+            messageDiv.textContent = "Set start (green), target (red), and walls (black)!";
+            drawGrid();
+        }
+
+        // Draw the entire grid
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    drawCell(r, c, grid[r][c]);
+                }
+            }
+        }
+
+        // Draw a single cell
+        function drawCell(r, c, state) {
+            const x = c * CELL_SIZE;
+            const y = r * CELL_SIZE;
+            ctx.fillStyle = COLORS[state];
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = '#CBD5E0'; // Light gray for cell borders
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+        }
+
+        // Convert row, col to a unique string key for Set/Map
+        function cellToKey(r, c) {
+            return `${r},${c}`;
+        }
+
+        // Convert key back to row, col
+        function keyToCell(key) {
+            const [r, c] = key.split(',').map(Number);
+            return { r, c };
+        }
+
+        // Get neighbors of a cell
+        function getNeighbors(r, c) {
+            const neighbors = [];
+            const directions = [
+                { dr: -1, dc: 0 }, // Up
+                { dr: 1, dc: 0 },  // Down
+                { dr: 0, dc: -1 }, // Left
+                { dr: 0, dc: 1 }   // Right
+            ];
+
+            for (const dir of directions) {
+                const nr = r + dir.dr;
+                const nc = c + dir.dc;
+
+                // Check bounds
+                if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                    neighbors.push({ r: nr, c: nc });
+                }
+            }
+            return neighbors;
+        }
+
+        // Reconstruct path from target to start using parentMap
+        function reconstructPath() {
+            if (!targetNode || !startNode || !parentMap.has(cellToKey(targetNode.r, targetNode.c))) {
+                return [];
+            }
+            const path = [];
+            let current = targetNode;
+            while (current && !(current.r === startNode.r && current.c === startNode.c)) {
+                path.unshift(current); // Add to beginning
+                current = parentMap.get(cellToKey(current.r, current.c));
+            }
+            path.unshift(startNode); // Add start node
+            return path;
+        }
+
+        // --- Event Handlers ---
+
+        // Handle clicks on the canvas to set start, target, or obstacles
+        function handleCanvasClick(event) {
+            if (isRunning) return; // Cannot modify grid while BFS is running
+
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            const c = Math.floor(x / CELL_SIZE);
+            const r = Math.floor(y / CELL_SIZE);
+
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return; // Click outside grid
+
+            const currentState = grid[r][c];
+
+            // Cycle through states: EMPTY -> START -> TARGET -> OBSTACLE -> EMPTY
+            if (currentState === EMPTY) {
+                if (!startNode) {
+                    grid[r][c] = START;
+                    startNode = { r, c };
+                } else if (!targetNode) {
+                    grid[r][c] = TARGET;
+                    targetNode = { r, c };
+                } else {
+                    grid[r][c] = OBSTACLE;
+                }
+            } else if (currentState === START) {
+                grid[r][c] = EMPTY;
+                startNode = null;
+            } else if (currentState === TARGET) {
+                grid[r][c] = EMPTY;
+                targetNode = null;
+            } else if (currentState === OBSTACLE) {
+                grid[r][c] = EMPTY;
+            }
+
+            drawGrid(); // Redraw immediately
+        }
+
+        // --- BFS Algorithm Core Logic (Animated) ---
+
+        let frameCounter = 0;
+        function bfsAnimationLoop() {
+            if (!isRunning) {
+                messageDiv.textContent = "Click 'Start BFS' to begin!";
+                return;
+            }
+
+            // Only perform a BFS step every few frames to slow down animation
+            if (frameCounter % (Math.floor(BFS_STEP_DELAY / 16.67)) === 0) { // Approx 60fps * delay
+                if (queue.length > 0) {
+                    const { r, c } = queue.shift(); // Dequeue the next cell
+
+                    // If we reached the target, stop BFS
+                    if (r === targetNode.r && c === targetNode.c) {
+                        isRunning = false;
+                        messageDiv.textContent = "Cheese found! The shortest path is orange!";
+                        const path = reconstructPath();
+                        // Draw path without changing start/target colors
+                        path.forEach(node => {
+                            if (grid[node.r][node.c] !== START && grid[node.r][node.c] !== TARGET) {
+                                grid[node.r][node.c] = PATH;
+                            }
+                        });
+                        drawGrid();
+                        return; // Stop the animation loop
+                    }
+
+                    // Mark as visited (if not start/target)
+                    if (grid[r][c] !== START) { // Don't overwrite start's color immediately
+                        grid[r][c] = VISITED;
+                    }
+                    drawCell(r, c, grid[r][c]); // Redraw immediately
+
+                    // Explore neighbors
+                    const neighbors = getNeighbors(r, c);
+                    for (const neighbor of neighbors) {
+                        const neighborKey = cellToKey(neighbor.r, neighbor.c);
+                        // If neighbor hasn't been visited and isn't an obstacle
+                        if (!visited.has(neighborKey) && grid[neighbor.r][neighbor.c] !== OBSTACLE) {
+                            visited.add(neighborKey);
+                            parentMap.set(neighborKey, { r, c }); // Store parent for path reconstruction
+                            queue.push(neighbor);
+                            // Mark as queued for visual feedback
+                            if (grid[neighbor.r][neighbor.c] !== TARGET) { // Don't overwrite target's color
+                                grid[neighbor.r][neighbor.c] = QUEUED;
+                            }
+                            drawCell(neighbor.r, neighbor.c, grid[neighbor.r][neighbor.c]); // Redraw immediately
+                        }
+                    }
+                } else {
+                    // Queue is empty, but target not found
+                    isRunning = false;
+                    messageDiv.textContent = "No cheese found! It's impossible to reach.";
+                    return; // Stop the animation loop
+                }
+            }
+            frameCounter++;
+            animationFrameId = requestAnimationFrame(bfsAnimationLoop);
+        }
+
+        // --- Control Button Actions ---
+
+        startButton.addEventListener('click', () => {
+            if (isRunning) return; // Prevent multiple starts
+
+            if (!startNode || !targetNode) {
+                messageDiv.textContent = "Please set both a start (green) and a target (red) first!";
+                return;
+            }
+
+            // Reset only visualization states for a new run
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (grid[r][c] === VISITED || grid[r][c] === QUEUED || grid[r][c] === PATH) {
+                        grid[r][c] = EMPTY;
+                    }
+                }
+            }
+            // Ensure start and target remain their original colors
+            grid[startNode.r][startNode.c] = START;
+            grid[targetNode.r][targetNode.c] = TARGET;
+
+            drawGrid(); // Redraw clean grid
+
+            queue = [];
+            visited = new Set();
+            parentMap = new Map();
+            isRunning = true;
+            messageDiv.textContent = "Mouse is searching for cheese...";
+
+            // Start BFS from the start node
+            queue.push(startNode);
+            visited.add(cellToKey(startNode.r, startNode.c));
+            // No need to change startNode color here, it's already green
+
+            // Start animation loop
+            frameCounter = 0;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(bfsAnimationLoop);
+        });
+
+        resetButton.addEventListener('click', () => {
+            initializeGrid();
+        });
+
+        // --- Initial Setup ---
+        window.addEventListener('load', () => {
+            setCanvasSize(); // Set initial size on load
+            initializeGrid(); // Initialize grid and draw it
+        });
+
+        window.addEventListener('resize', setCanvasSize); // Adjust canvas size on window resize
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling on touch
+            handleCanvasClick(e.touches[0]);
+        }, { passive: false });
+    </script>
+</body>
+</html>

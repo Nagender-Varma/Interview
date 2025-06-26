@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dijkstra's Algorithm Animator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #app-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        canvas {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            width: 100%; /* Make canvas responsive */
+            height: auto; /* Maintain aspect ratio */
+            display: block;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-image: linear-gradient(to right, #6366f1, #8b5cf6);
+            color: white;
+            font-size: 1rem;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button:disabled {
+            background-image: none;
+            background-color: #cbd5e1;
+            cursor: not-allowed;
+            box-shadow: none;
+            color: #64748b;
+        }
+        #status-message {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #334155;
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8fafc;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .node-label {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        .distance-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #475569;
+        }
+        .weight-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #475569;
+            background-color: #f0f4f8;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+<div id="app-container">
+    <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Dijkstra's Algorithm Animator</h1>
+    <div id="status-message" class="rounded-lg shadow-sm">
+        Click "Start Animation" to begin!
+    </div>
+    <canvas id="dijkstraCanvas" width="800" height="400"></canvas>
+    <div class="controls">
+        <button id="startButton">Start Animation</button>
+        <button id="nextButton" disabled>Next Step</button>
+        <button id="resetButton">Reset</button>
+    </div>
+</div>
+
+<script>
+        const canvas = document.getElementById('dijkstraCanvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const nextButton = document.getElementById('nextButton');
+        const resetButton = document.getElementById('resetButton');
+        const statusMessage = document.getElementById('status-message');
+
+        // --- Graph Definition ---
+        // Nodes are represented by their ID, x, and y coordinates.
+        // Edges connect two nodes and have a weight (distance).
+        const nodesData = [
+            { id: 'A', x: 100, y: 200 },
+            { id: 'B', x: 250, y: 100 },
+            { id: 'C', x: 250, y: 300 },
+            { id: 'D', x: 400, y: 200 },
+            { id: 'E', x: 550, y: 100 },
+            { id: 'F', x: 550, y: 300 },
+            { id: 'G', x: 700, y: 200 }
+        ];
+
+        const edgesData = [
+            { from: 'A', to: 'B', weight: 4 },
+            { from: 'A', to: 'C', weight: 2 },
+            { from: 'B', to: 'D', weight: 5 },
+            { from: 'C', to: 'D', weight: 8 },
+            { from: 'C', to: 'F', weight: 10 },
+            { from: 'D', to: 'E', weight: 3 },
+            { from: 'D', to: 'F', weight: 2 },
+            { from: 'E', to: 'G', weight: 6 },
+            { from: 'F', to: 'G', weight: 1 }
+        ];
+
+        let nodes = [];
+        let edges = [];
+        let startNodeId = 'A';
+        let targetNodeId = 'G';
+
+        // Dijkstra's algorithm state variables
+        let distances = {}; // Stores shortest distance from startNode to each node
+        let previousNodes = {}; // Stores the predecessor node in the shortest path
+        let unvisited = new Set(); // Set of unvisited nodes
+        let visited = new Set(); // Set of visited nodes
+        let currentProcessedNode = null; // Node currently being processed
+        let shortestPath = []; // Final shortest path
+
+        // Animation control
+        let animationStarted = false;
+        let step = 0;
+        let animationSequence = []; // Stores the states for each step of the animation
+
+        // --- Utility Functions ---
+        function getNodeById(id) {
+            return nodes.find(node => node.id === id);
+        }
+
+        function createGraphState() {
+            nodes = nodesData.map(data => ({
+                ...data,
+                distance: Infinity,
+                visited: false,
+                previous: null,
+                isCurrent: false,
+                isShortestPath: false
+            }));
+
+            edges = edgesData.map(data => ({
+                ...data,
+                isHighlight: false,
+                isShortestPath: false
+            }));
+
+            // Initialize Dijkstra's variables
+            nodes.forEach(node => {
+                distances[node.id] = Infinity;
+                previousNodes[node.id] = null;
+                unvisited.add(node.id);
+            });
+
+            // Set distance for the start node
+            const startNode = getNodeById(startNodeId);
+            if (startNode) {
+                distances[startNodeId] = 0;
+                startNode.distance = 0;
+            } else {
+                console.error("Start node not found!");
+            }
+
+            visited.clear();
+            currentProcessedNode = null;
+            shortestPath = [];
+            animationSequence = [];
+            step = 0;
+        }
+
+        // --- Drawing Functions ---
+        function drawGraph() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw edges first
+            edges.forEach(edge => {
+                const fromNode = getNodeById(edge.from);
+                const toNode = getNodeById(edge.to);
+                if (!fromNode || !toNode) return;
+
+                ctx.beginPath();
+                ctx.moveTo(fromNode.x, fromNode.y);
+                ctx.lineTo(toNode.x, toNode.y);
+                ctx.lineWidth = edge.isShortestPath ? 4 : (edge.isHighlight ? 3 : 2);
+                ctx.strokeStyle = edge.isShortestPath ? '#10B981' : (edge.isHighlight ? '#3B82F6' : '#94A3B8');
+                ctx.stroke();
+
+                // Draw arrow for direction (optional, but good for understanding)
+                const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+                const arrowLength = 10;
+                const arrowWidth = 5;
+                ctx.save();
+                ctx.translate(toNode.x, toNode.y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(-arrowLength, arrowWidth);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(-arrowLength, -arrowWidth);
+                ctx.fill();
+                ctx.restore();
+
+
+                // Draw weight label
+                const midX = (fromNode.x + toNode.x) / 2;
+                const midY = (fromNode.y + toNode.y) / 2;
+                ctx.fillStyle = '#475569';
+                ctx.font = '500 0.8rem Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Add a slight offset to prevent overlap with lines
+                let offsetX = (toNode.y - fromNode.y) / 50;
+                let offsetY = -(toNode.x - fromNode.x) / 50;
+                ctx.fillText(edge.weight.toString(), midX + offsetX, midY + offsetY);
+            });
+
+            // Draw nodes
+            nodes.forEach(node => {
+                // Node circle
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 25, 0, Math.PI * 2);
+                ctx.fillStyle = node.isShortestPath ? '#10B981' : (node.isCurrent ? '#FCD34D' : (node.visited ? '#BFDBFE' : '#60A5FA'));
+                ctx.fill();
+                ctx.strokeStyle = '#374151';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Node ID
+                ctx.fillStyle = node.isShortestPath ? 'white' : '#1F2937';
+                ctx.font = 'bold 1rem Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.id, node.x, node.y - 10);
+
+                // Node distance
+                ctx.fillStyle = node.isShortestPath ? 'white' : '#334155';
+                ctx.font = '500 0.85rem Inter';
+                ctx.fillText(node.distance === Infinity ? '∞' : node.distance, node.x, node.y + 15);
+
+                // Mark start and target nodes
+                if (node.id === startNodeId) {
+                    ctx.fillStyle = '#1D4ED8';
+                    ctx.font = 'bold 0.75rem Inter';
+                    ctx.fillText('Start', node.x, node.y - 35);
+                }
+                if (node.id === targetNodeId) {
+                    ctx.fillStyle = '#DC2626';
+                    ctx.font = 'bold 0.75rem Inter';
+                    ctx.fillText('Target', node.x, node.y + 35);
+                }
+            });
+        }
+
+        // --- Dijkstra's Algorithm Simulation Steps ---
+        function runDijkstraSimulation() {
+            // Step 0: Initial state
+            let currentNodesState = JSON.parse(JSON.stringify(nodes));
+            let currentEdgesState = JSON.parse(JSON.stringify(edges));
+            animationSequence.push({
+                nodes: currentNodesState,
+                edges: currentEdgesState,
+                message: `Initializing: All distances set to ∞, Start Node '${startNodeId}' is 0.`
+            });
+
+            // Main loop of Dijkstra's
+            while (unvisited.size > 0) {
+                // Find unvisited node with the smallest distance
+                let minDistance = Infinity;
+                let nextNodeId = null;
+
+                unvisited.forEach(nodeId => {
+                    if (distances[nodeId] < minDistance) {
+                        minDistance = distances[nodeId];
+                        nextNodeId = nodeId;
+                    }
+                });
+
+                if (nextNodeId === null || minDistance === Infinity) {
+                    // No reachable unvisited nodes left
+                    break;
+                }
+
+                currentProcessedNode = getNodeById(nextNodeId);
+                if (!currentProcessedNode) break; // Should not happen
+
+                // Mark current node as visited
+                unvisited.delete(nextNodeId);
+                visited.add(nextNodeId);
+                currentProcessedNode.visited = true;
+                currentProcessedNode.isCurrent = true; // Highlight current node
+
+                // Snapshot 1: Node selected
+                currentNodesState = JSON.parse(JSON.stringify(nodes));
+                currentEdgesState = JSON.parse(JSON.stringify(edges));
+                animationSequence.push({
+                    nodes: currentNodesState,
+                    edges: currentEdgesState,
+                    message: `Processing Node '${nextNodeId}': Smallest known distance among unvisited nodes. Mark as visited.`
+                });
+
+                // Explore neighbors
+                edges.forEach(edge => {
+                    let neighborId = null;
+                    if (edge.from === nextNodeId) {
+                        neighborId = edge.to;
+                    } else if (edge.to === nextNodeId && !visited.has(edge.from)) {
+                        // For undirected graph, handle both directions
+                        // But standard Dijkstra processes outwards, so focus on 'from'
+                        // For simplicity in visualization, we'll assume directed A->B if not explicitly told otherwise
+                        // If it's truly undirected, we'd need to add reverse edges with same weight.
+                        // For this example, let's treat edgesData as A -> B, not A <-> B
+                        return;
+                    }
+
+                    if (neighborId && unvisited.has(neighborId)) {
+                        const neighborNode = getNodeById(neighborId);
+                        const newDistance = distances[nextNodeId] + edge.weight;
+
+                        // Highlight edge being considered
+                        edge.isHighlight = true;
+                        currentEdgesState = JSON.parse(JSON.stringify(edges));
+                        currentNodesState = JSON.parse(JSON.stringify(nodes));
+                        animationSequence.push({
+                            nodes: currentNodesState,
+                            edges: currentEdgesState,
+                            message: `Checking edge from '${nextNodeId}' to '${neighborId}' (weight: ${edge.weight}).`
+                        });
+
+                        if (newDistance < distances[neighborId]) {
+                            distances[neighborId] = newDistance;
+                            previousNodes[neighborId] = nextNodeId;
+                            neighborNode.distance = newDistance; // Update distance for drawing
+
+                            currentNodesState = JSON.parse(JSON.stringify(nodes));
+                            currentEdgesState = JSON.parse(JSON.stringify(edges));
+                            animationSequence.push({
+                                nodes: currentNodesState,
+                                edges: currentEdgesState,
+                                message: `Update: Path to '${neighborId}' via '${nextNodeId}' is shorter (${newDistance}).`
+                            });
+                        } else {
+                            currentNodesState = JSON.parse(JSON.stringify(nodes));
+                            currentEdgesState = JSON.parse(JSON.stringify(edges));
+                            animationSequence.push({
+                                nodes: currentNodesState,
+                                edges: currentEdgesState,
+                                message: `No update: Path to '${neighborId}' via '${nextNodeId}' is not shorter.`
+                            });
+                        }
+                        edge.isHighlight = false; // Reset highlight
+                    }
+                });
+
+                // After processing neighbors, reset current node highlight
+                currentProcessedNode.isCurrent = false;
+            }
+
+            // Final step: Path reconstruction
+            if (distances[targetNodeId] !== Infinity) {
+                let currentNodeId = targetNodeId;
+                while (currentNodeId !== null) {
+                    shortestPath.unshift(currentNodeId);
+                    const node = getNodeById(currentNodeId);
+                    if (node) node.isShortestPath = true;
+                    currentNodeId = previousNodes[currentNodeId];
+                }
+
+                // Highlight edges in shortest path
+                for (let i = 0; i < shortestPath.length - 1; i++) {
+                    const fromId = shortestPath[i];
+                    const toId = shortestPath[i+1];
+                    const edge = edges.find(e => (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId));
+                    if (edge) edge.isShortestPath = true;
+                }
+
+                currentNodesState = JSON.parse(JSON.stringify(nodes));
+                currentEdgesState = JSON.parse(JSON.stringify(edges));
+                animationSequence.push({
+                    nodes: currentNodesState,
+                    edges: currentEdgesState,
+                    message: `Algorithm finished! Shortest path from '${startNodeId}' to '${targetNodeId}' is ${shortestPath.join(' -> ')} with total distance ${distances[targetNodeId]}.`
+                });
+
+            } else {
+                currentNodesState = JSON.parse(JSON.stringify(nodes));
+                currentEdgesState = JSON.parse(JSON.stringify(edges));
+                animationSequence.push({
+                    nodes: currentNodesState,
+                    edges: currentEdgesState,
+                    message: `Algorithm finished! Target Node '${targetNodeId}' is unreachable from '${startNodeId}'.`
+                });
+            }
+        }
+
+        // --- Animation Control Functions ---
+        function startAnimation() {
+            animationStarted = true;
+            startButton.disabled = true;
+            nextButton.disabled = false;
+            resetButton.disabled = false;
+            createGraphState(); // Re-initialize state for a fresh run
+            runDijkstraSimulation(); // Generate all animation steps
+            updateAnimation();
+        }
+
+        function nextStep() {
+            if (step < animationSequence.length - 1) {
+                step++;
+                updateAnimation();
+            } else {
+                statusMessage.textContent = "Animation finished. Click Reset to start again.";
+                nextButton.disabled = true;
+            }
+        }
+
+        function resetAnimation() {
+            animationStarted = false;
+            startButton.disabled = false;
+            nextButton.disabled = true;
+            resetButton.disabled = true;
+            createGraphState(); // Reset all graph and algorithm states
+            drawGraph(); // Draw initial state
+            statusMessage.textContent = "Click 'Start Animation' to begin!";
+        }
+
+        function updateAnimation() {
+            if (step < animationSequence.length) {
+                const state = animationSequence[step];
+                nodes = state.nodes;
+                edges = state.edges;
+                statusMessage.textContent = state.message;
+                drawGraph();
+            }
+        }
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', startAnimation);
+        nextButton.addEventListener('click', nextStep);
+        resetButton.addEventListener('click', resetAnimation);
+
+        // Initial draw
+        createGraphState();
+        drawGraph();
+
+        // Handle canvas resizing for responsiveness
+        function resizeCanvas() {
+            const container = document.getElementById('app-container');
+            const containerWidth = container.clientWidth - 48; // Account for padding
+            // Maintain aspect ratio, e.g., 2:1
+            canvas.width = containerWidth;
+            canvas.height = containerWidth / 2;
+            drawGraph(); // Redraw graph after resize
+            // Recalculate node positions if needed for different aspect ratios
+            // For this fixed example, we scale proportionally.
+        }
+
+        // Initial resize and add listener
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Call on load
+    </script>
+</body>
+</html>
