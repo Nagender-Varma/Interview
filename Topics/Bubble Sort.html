@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Sort Animator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #app-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        canvas {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            width: 100%; /* Make canvas responsive */
+            height: auto; /* Maintain aspect ratio */
+            display: block;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-image: linear-gradient(to right, #6366f1, #8b5cf6);
+            color: white;
+            font-size: 1rem;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button:disabled {
+            background-image: none;
+            background-color: #cbd5e1;
+            cursor: not-allowed;
+            box-shadow: none;
+            color: #64748b;
+        }
+        #status-message {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #334155;
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8fafc;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .bar-value {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1F2937;
+        }
+    </style>
+</head>
+<body>
+<div id="app-container">
+    <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Bubble Sort Animator</h1>
+    <div id="status-message" class="rounded-lg shadow-sm">
+        Click "Start Animation" to begin!
+    </div>
+    <canvas id="sortCanvas" width="800" height="400"></canvas>
+    <div class="controls">
+        <button id="startButton">Start Animation</button>
+        <button id="nextButton" disabled>Next Step</button>
+        <button id="resetButton">Reset</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('sortCanvas');
+    const ctx = canvas.getContext('2d');
+    const startButton = document.getElementById('startButton');
+    const nextButton = document.getElementById('nextButton');
+    const resetButton = document.getElementById('resetButton');
+    const statusMessage = document.getElementById('status-message');
+
+    // Initial array for sorting
+    let originalArray = [5, 3, 4, 1, 2];
+    let array = [...originalArray]; // Working copy of the array
+
+    // Animation state variables
+    let animationSteps = []; // Stores the state of the array and message for each step
+    let currentStepIndex = 0;
+    let animationRunning = false;
+
+    // Canvas drawing parameters
+    const barWidth = 60;
+    const barSpacing = 10;
+    const maxBarHeight = 250;
+    const maxValue = Math.max(...originalArray); // Max value in the original array for scaling
+
+    // --- Drawing Function ---
+    function drawArray(arr, highlightIndex1 = -1, highlightIndex2 = -1, sortedUntilIndex = -1) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+        const totalWidth = arr.length * (barWidth + barSpacing) - barSpacing;
+        const startX = (canvas.width - totalWidth) / 2;
+        const baseY = canvas.height - 50; // Base for bars, leaving space for values below
+
+        for (let i = 0; i < arr.length; i++) {
+            const barHeight = (arr[i] / maxValue) * maxBarHeight;
+            const x = startX + i * (barWidth + barSpacing);
+            const y = baseY - barHeight;
+
+            // Determine bar color
+            let barColor = '#60A5FA'; // Default blue
+            if (i === highlightIndex1 || i === highlightIndex2) {
+                barColor = '#FCD34D'; // Yellow for comparison
+            } else if (i >= arr.length - 1 - sortedUntilIndex && sortedUntilIndex !== -1) {
+                barColor = '#10B981'; // Green for sorted elements
+            }
+
+            // Draw bar
+            ctx.fillStyle = barColor;
+            ctx.fillRect(x, y, barWidth, barHeight);
+
+            // Draw border
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, barWidth, barHeight);
+
+            // Draw value inside bar
+            ctx.fillStyle = '#1F2937';
+            ctx.font = 'bold 1.2rem Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(arr[i].toString(), x + barWidth / 2, y + barHeight / 2);
+
+            // Draw index below bar (optional)
+            ctx.fillStyle = '#475569';
+            ctx.font = '0.8rem Inter';
+            ctx.fillText(`[${i}]`, x + barWidth / 2, baseY + 20);
+        }
+    }
+
+    // --- Bubble Sort Simulation Logic ---
+    function simulateBubbleSort() {
+        animationSteps = [];
+        let currentArray = [...originalArray];
+        const n = currentArray.length;
+
+        // Initial state
+        animationSteps.push({
+            array: [...currentArray],
+            message: "Initial Array. Click 'Next Step' to begin sorting.",
+            highlight1: -1,
+            highlight2: -1,
+            sortedUntil: -1
+        });
+
+        for (let i = 0; i < n - 1; i++) {
+            let swapped = false;
+            animationSteps.push({
+                array: [...currentArray],
+                message: `Pass ${i + 1}: Starting iteration. Largest element will bubble to position ${n - 1 - i}.`,
+                highlight1: -1,
+                highlight2: -1,
+                sortedUntil: i
+            });
+
+            for (let j = 0; j < n - 1 - i; j++) {
+                // State before comparison
+                animationSteps.push({
+                    array: [...currentArray],
+                    message: `Comparing elements at index ${j} (${currentArray[j]}) and ${j + 1} (${currentArray[j + 1]}).`,
+                    highlight1: j,
+                    highlight2: j + 1,
+                    sortedUntil: i
+                });
+
+                if (currentArray[j] > currentArray[j + 1]) {
+                    // Swap elements
+                    let temp = currentArray[j];
+                    currentArray[j] = currentArray[j + 1];
+                    currentArray[j + 1] = temp;
+                    swapped = true;
+
+                    // State after swap
+                    animationSteps.push({
+                        array: [...currentArray],
+                        message: `Swapped ${currentArray[j + 1]} and ${currentArray[j]}. Array updated.`,
+                        highlight1: j,
+                        highlight2: j + 1,
+                        sortedUntil: i
+                    });
+                } else {
+                    // State if no swap
+                    animationSteps.push({
+                        array: [...currentArray],
+                        message: `${currentArray[j]} is not greater than ${currentArray[j + 1]}. No swap needed.`,
+                        highlight1: j,
+                        highlight2: j + 1,
+                        sortedUntil: i
+                    });
+                }
+            }
+
+            if (!swapped) {
+                // If no swaps in a pass, the array is sorted
+                animationSteps.push({
+                    array: [...currentArray],
+                    message: `No swaps occurred in Pass ${i + 1}. Array is already sorted!`,
+                    highlight1: -1,
+                    highlight2: -1,
+                    sortedUntil: n - 1 // All elements are sorted
+                });
+                break;
+            }
+        }
+
+        // Final sorted state
+        animationSteps.push({
+            array: [...currentArray],
+            message: "Sorting complete! The array is now sorted.",
+            highlight1: -1,
+            highlight2: -1,
+            sortedUntil: n - 1
+        });
+    }
+
+    // --- Animation Control Functions ---
+    function startAnimation() {
+        animationRunning = true;
+        startButton.disabled = true;
+        nextButton.disabled = false;
+        resetButton.disabled = false;
+        array = [...originalArray]; // Reset array to original
+        simulateBubbleSort(); // Generate all steps
+        currentStepIndex = 0;
+        updateAnimation();
+    }
+
+    function nextStep() {
+        if (currentStepIndex < animationSteps.length - 1) {
+            currentStepIndex++;
+            updateAnimation();
+        } else {
+            statusMessage.textContent = "Animation finished. Click Reset to start again.";
+            nextButton.disabled = true;
+        }
+    }
+
+    function resetAnimation() {
+        animationRunning = false;
+        startButton.disabled = false;
+        nextButton.disabled = true;
+        resetButton.disabled = true;
+        array = [...originalArray]; // Reset array to original
+        currentStepIndex = 0;
+        animationSteps = [];
+        drawArray(array); // Draw initial state
+        statusMessage.textContent = "Click 'Start Animation' to begin!";
+    }
+
+    function updateAnimation() {
+        if (animationSteps.length > 0 && currentStepIndex < animationSteps.length) {
+            const stepData = animationSteps[currentStepIndex];
+            drawArray(stepData.array, stepData.highlight1, stepData.highlight2, stepData.sortedUntil);
+            statusMessage.textContent = stepData.message;
+        }
+    }
+
+    // --- Event Listeners and Initial Setup ---
+    startButton.addEventListener('click', startAnimation);
+    nextButton.addEventListener('click', nextStep);
+    resetButton.addEventListener('click', resetAnimation);
+
+    // Handle canvas resizing for responsiveness
+    function resizeCanvas() {
+        const container = document.getElementById('app-container');
+        const containerWidth = container.clientWidth - 48; // Account for padding
+        // Maintain aspect ratio, e.g., 2:1
+        canvas.width = containerWidth;
+        canvas.height = containerWidth / 2;
+        updateAnimation(); // Redraw graph after resize
+    }
+
+    // Initial draw and setup
+    drawArray(array);
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // Call on load
+</script>
+</body>
+</html>
