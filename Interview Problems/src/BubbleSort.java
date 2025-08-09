@@ -1,9 +1,7 @@
-import java.util.Arrays;
-
 public class BubbleSort {
     public static void main(String[] args) {
 
-        int[] arr = {5, 3, 40, 10, 2};
+        int[] arr = {5, 3, 4, 1, 2};
         System.out.println("Original Array:");
         printArray(arr);
         System.out.println("Bubble Sort Execution Steps");
@@ -14,7 +12,9 @@ public class BubbleSort {
     }
 
     private static void printArray(int[] arr) {
-        System.out.println(Arrays.toString(arr));
+        for (int num : arr) {
+            System.out.print(num + "");
+        }
         System.out.println();
     }
 
@@ -24,11 +24,10 @@ public class BubbleSort {
         for (int i = 0; i < lengthOfArray - 1; i++) {
             System.out.println("Outer Loop Pass  " + pass);
             pass++;
+
             for (int j = 0; j < lengthOfArray - i - 1; j++) {
                 System.out.println("Inner Loop Iteration (i = " +
                         i + ", j =" + j + ")");
-                System.out.println("Before Swapping");
-                System.out.println(Arrays.toString(arr));
                 if(arr[j]>arr[j+1]){
                     System.out.println("Swapping " + arr[j] + " and " + arr[j+1]);
                     int temp = arr[j];
