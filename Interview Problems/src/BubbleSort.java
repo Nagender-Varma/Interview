@@ -1,46 +1,50 @@
+
+import java.util.Arrays;
+
 public class BubbleSort {
+
     public static void main(String[] args) {
 
-        int[] arr = {5, 3, 4, 1, 2};
-        System.out.println("Original Array:");
-        printArray(arr);
-        System.out.println("Bubble Sort Execution Steps");
+        int[] arr = {879, 45, 440, 324, 78, 124, 568};
+        System.out.println("Initialized Array as follows");
+        System.out.println(Arrays.toString(arr));
+        System.out.println("Sorting begins");
+
         bubbleSort(arr);
-        System.out.println("Sorted Array");
-        printArray(arr);
 
-    }
-
-    private static void printArray(int[] arr) {
-        for (int num : arr) {
-            System.out.print(num + "");
-        }
-        System.out.println();
     }
 
     private static void bubbleSort(int[] arr) {
+
         int pass = 1;
-        int lengthOfArray = arr.length;
+        int lengthOfArray = arr.length;  // 7
+
         for (int i = 0; i < lengthOfArray - 1; i++) {
-            System.out.println("Outer Loop Pass  " + pass);
+            System.out.println("Outer loop : " + pass);
             pass++;
 
             for (int j = 0; j < lengthOfArray - i - 1; j++) {
-                System.out.println("Inner Loop Iteration (i = " +
-                        i + ", j =" + j + ")");
-                if(arr[j]>arr[j+1]){
-                    System.out.println("Swapping " + arr[j] + " and " + arr[j+1]);
-                    int temp = arr[j];
-                    arr[j]= arr[j+1];
-                    arr[j+1] = temp;
+                System.out.println();
+
+                System.out.println("Inner Loop Values for i = " + i + " and j = " + j);
+                System.out.println();
+
+                System.out.println("Before Swapping array");
+                System.out.println(Arrays.toString(arr));
+                System.out.println();
+                if (arr[j] > arr[j + 1]) {
+                    System.out.println("Swapping " + arr[j] + " and " + arr[j + 1]);
+                    System.out.println();
+
+                    int temp = arr[j]; // temp = 879
+                    arr[j] = arr[j + 1]; // arr[j] is also 879,  now arr[j] will be assigned with arr[j+1] 45
+                    arr[j + 1] = temp; // arr[j=1] which 45 is already assigned to arr[j], now the value from temp is assiged to arr[j+1] which 879
+                    System.out.println("After Swapping");
                 }
-                printArray(arr);
+                System.out.println(Arrays.toString(arr));
+
             }
-            System.out.println();
 
         }
-
-
     }
 }
-
